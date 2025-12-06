@@ -25,6 +25,11 @@ fn init_my_logger() -> bool {
     true
 }
 
+// --- Response helpers ---
+fn json_response(status_code: u16, json: &str) -> cgi::Response {
+    cgi::binary_response(status_code, "application/json", json.as_bytes().to_vec())
+}
+
 // --- Utility functions ---
 fn str_ends_with(haystack: &str, needle: &str) -> bool {
     haystack.ends_with(needle)
@@ -83,41 +88,28 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
         info!("Hello to logger!");
     }
 
+    let vars = request.env();
     let api = {
-        let uri = request.env().get("REQUEST_URI").unwrap_or("/");
+        let uri = vars.get("REQUEST_URI").map(|s| s.as_str()).unwrap_or("/");
         str_before(uri, "?")
     };
-    let query = request.env().get("QUERY_STRING").unwrap_or("");
-    let accept = request.env().get("HTTP_ACCEPT").map(|s| s.to_string());
+    let query = vars.get("QUERY_STRING").map(|s| s.as_str()).unwrap_or("");
+    let accept = vars.get("HTTP_ACCEPT").map(|s| s.to_string());
 
-    let server_url = get_server_url(request.env());
+    let server_url = get_server_url(&vars);
     let mut dir = String::new();
-
-    // Set Content-Type if Accept header is present
-    let mut headers = vec![];
-    if let Some(accept) = accept {
-        headers.push(("Content-Type".to_string(), accept));
-    }
 
     // /locks/verify
     if str_ends_with(api, "/locks/verify") {
         dir = slash_process(str_before(api, "/locks/verify"));
         let body = locks_verify(&request);
-        return cgi::Response::builder()
-            .status(200)
-            .headers(headers)
-            .body(body)
-            .build();
+        return json_response(200, &body);
     }
     // /objects/batch
     else if str_ends_with(api, "/objects/batch") {
         dir = slash_process(str_before(api, "/objects/batch"));
         let body = objects_batch(&request, &server_url, &dir);
-        return cgi::Response::builder()
-            .status(200)
-            .headers(headers)
-            .body(body)
-            .build();
+        return json_response(200, &body);
     }
     // /upload
     else if str_ends_with(api, "/upload") {
@@ -135,10 +127,7 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
     }
     // 404
     else {
-        return cgi::Response::builder()
-            .status(404)
-            .body("Not Found".to_string())
-            .build();
+        return cgi::empty_response(404);
     }
 } }
 
@@ -150,8 +139,7 @@ fn locks_verify(_request: &cgi::Request) -> String {
 }
 
 fn objects_batch(request: &cgi::Request, server_url: &str, dir: &str) -> String {
-    let mut input = String::new();
-    request.body().read_to_string(&mut input).ok();
+    let input = String::from_utf8_lossy(request.body()).to_string();
     let input_json: serde_json::Value = serde_json::from_str(&input).unwrap_or(serde_json::json!({}));
     let operation = input_json.get("operation").and_then(|v| v.as_str()).unwrap_or("");
     let objects = input_json.get("objects").and_then(|v| v.as_array()).cloned().unwrap_or(vec![]);
@@ -192,10 +180,7 @@ fn upload(request: &cgi::Request, dir: &str, params: &HashMap<String, String>) -
     let oid = match params.get("oid") {
         Some(oid) if !oid.is_empty() => oid,
         _ => {
-            return cgi::Response::builder()
-                .status(404)
-                .body("Not Found".to_string())
-                .build();
+            return cgi::empty_response(404);
         }
     };
     let objects_dir = format!("data/{}objects", dir);
@@ -205,10 +190,7 @@ fn upload(request: &cgi::Request, dir: &str, params: &HashMap<String, String>) -
     // Create directory if not exists
     if !Path::new(&objects_dir).exists() {
         if let Err(e) = fs::create_dir_all(&objects_dir) {
-            return cgi::Response::builder()
-                .status(500)
-                .body(format!("Failed to create dir: {}", e))
-                .build();
+            return cgi::empty_response(500);
         }
     }
     // Write file if not exists
@@ -216,35 +198,22 @@ fn upload(request: &cgi::Request, dir: &str, params: &HashMap<String, String>) -
         let mut file = match File::create(&path) {
             Ok(f) => f,
             Err(e) => {
-                return cgi::Response::builder()
-                    .status(500)
-                    .body(format!("Failed to create file: {}", e))
-                    .build();
+                return cgi::empty_response(500);
             }
         };
-        let mut body = Vec::new();
-        request.body().read_to_end(&mut body).ok();
-        if let Err(e) = file.write_all(&body) {
-            return cgi::Response::builder()
-                .status(500)
-                .body(format!("Failed to write file: {}", e))
-                .build();
+        let body = request.body();
+        if let Err(e) = file.write_all(body) {
+            return cgi::empty_response(500);
         }
     }
-    cgi::Response::builder()
-        .status(200)
-        .body("".to_string())
-        .build()
+    return cgi::empty_response(200);
 }
 
 fn download(dir: &str, params: &HashMap<String, String>) -> cgi::Response {
     let oid = match params.get("oid") {
         Some(oid) if !oid.is_empty() => oid,
         _ => {
-            return cgi::Response::builder()
-                .status(404)
-                .body("Not Found".to_string())
-                .build();
+            return cgi::empty_response(404);
         }
     };
     let path = format!("data/{}objects/{}", dir, oid);
@@ -253,28 +222,14 @@ fn download(dir: &str, params: &HashMap<String, String>) -> cgi::Response {
         let mut file = match File::open(&path) {
             Ok(f) => f,
             Err(_) => {
-                return cgi::Response::builder()
-                    .status(500)
-                    .body("Failed to open file".to_string())
-                    .build();
+                return cgi::empty_response(500);
             }
         };
         let mut buf = Vec::new();
+        use std::io::Read;
         file.read_to_end(&mut buf).ok();
-        cgi::Response::builder()
-            .status(200)
-            .header("Content-Description", "File Transfer")
-            .header("Content-Type", "application/octet-stream")
-            .header("Expires", "0")
-            .header("Cache-Control", "must-revalidate")
-            .header("Pragma", "public")
-            .header("Content-Length", &buf.len().to_string())
-            .body_bytes(buf)
-            .build()
+        return cgi::binary_response(200, "application/octet-stream", buf);
     } else {
-        cgi::Response::builder()
-            .status(404)
-            .body("Not Found".to_string())
-            .build()
+        return cgi::empty_response(404);
     }
 }
