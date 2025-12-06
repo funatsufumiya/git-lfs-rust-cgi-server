@@ -48,56 +48,79 @@ fn slash_process(s: &str) -> String {
     }
     s
 }
+
+// --- Repo dir extraction ---
+fn extract_repo_dir(request: &cgi::Request, api: &str) -> String {
+    if let Some(path_info) = request.headers().get("x-cgi-path-info").and_then(|v| v.to_str().ok()) {
+        let path = path_info.trim_start_matches('/');
+        let candidates = ["/objects", "/locks", "/upload", "/download"];
+        for needle in candidates.iter() {
+            if let Some(pos) = path.find(needle) {
+                return path[..pos].to_string();
+            }
+        }
+        return path.to_string();
+    }
+    let candidates = ["/objects", "/locks", "/upload", "/download"];
+    let path = api.trim_start_matches('/');
+    for needle in candidates.iter() {
+        if let Some(pos) = path.find(needle) {
+            return path[..pos].to_string();
+        }
+    }
+    "".to_string()
+}
 fn parse_query(query: &str) -> HashMap<String, String> {
     url::form_urlencoded::parse(query.as_bytes())
         .into_owned()
         .collect()
 }
-fn get_server_url(env: &std::collections::HashMap<String, String>) -> String {
-    // REQUEST_SCHEME (or infer from HTTPS), HTTP_HOST, SERVER_PORT, SCRIPT_NAME
-    let scheme = if let Some(s) = env.get("REQUEST_SCHEME") {
-        s.to_string()
-    } else if let Some(https) = env.get("HTTPS") {
-        if https == "on" || https == "1" { "https".to_string() } else { "http".to_string() }
-    } else {
-        "http".to_string()
-    };
-    let host = env.get("HTTP_HOST")
-        .or_else(|| env.get("SERVER_NAME"))
-        .cloned()
-        .unwrap_or_else(|| "localhost".to_string());
-    let port = env.get("SERVER_PORT").cloned().unwrap_or_else(|| "80".to_string());
-    let script_name = env.get("SCRIPT_NAME").cloned().unwrap_or_default();
 
-    let port_part = if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
-        String::new()
-    } else {
-        format!(":{}", port)
-    };
-
-    let mut base_path = script_name.trim_end_matches('/').to_string();
-    if let Some(pos) = base_path.rfind('/') {
-        base_path = base_path[..=pos].to_string();
+fn extract_script_name(request: &cgi::Request) -> String {
+    if let Some(uri) = request.headers().get("x-cgi-request-uri").and_then(|v| v.to_str().ok()) {
+        if let Some(pos) = uri.find(".cgi") {
+            let end = pos + ".cgi".len();
+            return uri[..end].to_string();
+        }
     }
-    if !base_path.ends_with('/') { base_path.push('/'); }
-    format!("{}://{}{}{}", scheme, host, port_part, base_path)
+    // // fallback: envのSCRIPT_NAMEや空文字
+    // request.env().get("SCRIPT_NAME").cloned().unwrap_or_default()
+    return "git-lfs-rust.cgi".to_string();
+}
+
+fn get_server_url(request: &cgi::Request) -> String {
+    let scheme = request.headers().get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("http");
+
+    let host = request.headers().get("x-forwarded-host")
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| request.headers().get("host").and_then(|v| v.to_str().ok()))
+        .unwrap_or("localhost");
+
+    let script_name = extract_script_name(&request);
+
+    format!("{}://{}{}", scheme, host, script_name)
 }
 
 // --- Main handler ---
 cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
-    if is_logger_init() {
-        // info!("Hello to logger!");
-        let now = Local::now();
-        info!("Access at {}", now.format("%Y-%m-%d %H:%M:%S"));
-    }
-
     let uri = request.uri().to_string();
     let api = str_before(&uri, "?");
     let query = request.uri().query().unwrap_or("");
     let accept = request.headers().get("accept").and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-    // If you need server_url, you must reconstruct it from available request data or remove its usage.
-    let server_url = "".to_string(); // Placeholder or reconstruct as needed
+    let server_url = get_server_url(&request);
     let mut dir = String::new();
+
+    if is_logger_init() {
+        let now = Local::now();
+        info!("Access at {}", now.format("%Y-%m-%d %H:%M:%S"));
+        info!("request uri: {}", request.uri());
+        for (key, value) in request.headers().iter() {
+            let value_str = value.to_str().unwrap_or("<invalid utf8>");
+            info!("Header: {} = {}", key, value_str);
+        }
+    }
 
     // /version
     if str_ends_with(api, "/version") {
@@ -114,26 +137,30 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
     }
     // /locks/verify
     else if str_ends_with(api, "/locks/verify") {
-        dir = slash_process(str_before(api, "/locks/verify"));
+        dir = extract_repo_dir(&request, api);
+        dir = slash_process(&dir);
         let body = locks_verify(&request);
         return json_response(200, &body);
     }
     // /objects/batch
     else if str_ends_with(api, "/objects/batch") {
-        dir = slash_process(str_before(api, "/objects/batch"));
+        dir = extract_repo_dir(&request, api);
+        dir = slash_process(&dir);
         let body = objects_batch(&request, &server_url, &dir);
         return json_response(200, &body);
     }
     // /upload
     else if str_ends_with(api, "/upload") {
-        dir = slash_process(str_before(api, "/upload"));
+        dir = extract_repo_dir(&request, api);
+        dir = slash_process(&dir);
         let params = parse_query(query);
         let resp = upload(&request, &dir, &params);
         return resp;
     }
     // /download
     else if str_ends_with(api, "/download") {
-        dir = slash_process(str_before(api, "/download"));
+        dir = extract_repo_dir(&request, api);
+        dir = slash_process(&dir);
         let params = parse_query(query);
         let resp = download(&dir, &params);
         return resp;
