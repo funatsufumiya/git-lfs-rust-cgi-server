@@ -147,6 +147,18 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
         let body = r#"{"message":"This is a test endpoint","status":"ok"}"#;
         return json_response(200, body);
     }
+    // /put_test
+    else if str_ends_with(api, "/put_test") {
+        let method = request.method().to_string();
+        if method == "PUT" {
+            let body = String::from_utf8_lossy(request.body()).to_string();
+            let resp = format!(r#"{{"message":"PUT received!","data":"{}"}}"#, body);
+            return json_response(200, &resp);
+        } else {
+            let resp = r#"{"message":"Not a PUT request."}"#;
+            return json_response(200, resp);
+        }
+    }
     // /locks/verify
     else if str_ends_with(api, "/locks/verify") {
         dir = extract_repo_dir(&request, api);
