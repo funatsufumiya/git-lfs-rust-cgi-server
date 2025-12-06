@@ -1,7 +1,19 @@
 # git-lfs-rust-cgi-server
 
+## Usage
+
+place `git-lfs-rust.cgi` into your server, then set `.lfsconfig` like this:
+
+```toml
+[lfs]
+url = "https://your-server/git-lfs-rust.cgi/owner/repo"
+```
+
+then, your server works as LFS server!
+
 > [!WARNING]
-> ***WORK-IN-PROGRESS***
+> Currently don't have any credential support.<br>
+> Please consider basic auth or something, and **DO NOT USE FOR SOMETHING IMPORTANT** (just use for hobby).
 
 ## Deploy
 
