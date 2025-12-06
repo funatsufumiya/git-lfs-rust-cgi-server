@@ -1,5 +1,6 @@
 extern crate cgi;
 use chrono::{Utc, Local, DateTime, Date};
+use flexi_logger::{Logger, Criterion, Naming, Cleanup};
 use log::info;
 use log::LevelFilter;
 use std::fs::{self, File};
@@ -22,7 +23,18 @@ fn is_logger_init() -> bool {
     return false;
 }
 fn init_my_logger() -> bool {
-    let _ = simple_logging::log_to_file("git-lfs-rust.log", LevelFilter::Info);
+    // let _ = simple_logging::log_to_file("git-lfs-rust.log", LevelFilter::Info);
+    Logger::try_with_str("info")
+        .unwrap()
+        .log_to_file(flexi_logger::FileSpec::default().basename("git-lfs-rust").suffix("log"))
+        .append()
+        .rotate(
+            Criterion::Size(10_000_000), // 10MB
+            Naming::Numbers,
+            Cleanup::KeepLogFiles(1),
+        )
+        .start()
+        .unwrap();
     true
 }
 
