@@ -7,8 +7,14 @@ lazy_static! {
     static ref IS_LOGGER_INIT: bool = init_my_logger();
 }
 
+#[cfg(feature = "log")]
 fn is_logger_init() -> bool {
      return *IS_LOGGER_INIT;
+}
+
+#[cfg(not(feature = "log"))]
+fn is_logger_init() -> bool {
+     return false;
 }
 
 fn init_my_logger() -> bool {
