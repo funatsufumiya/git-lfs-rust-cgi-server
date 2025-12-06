@@ -17,6 +17,8 @@ then, your server works as LFS server!
 
 ## Deploy (Install)
 
+Please consider to use [Releases](https://github.com/funatsufumiya/git-lfs-rust-cgi-server/releases) prebuilt binaries first.
+
 > [!NOTE]
 > If you can't cross compile on Windows, try WSL instead.
 
