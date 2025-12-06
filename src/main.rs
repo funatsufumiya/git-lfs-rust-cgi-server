@@ -189,7 +189,12 @@ fn objects_batch(request: &cgi::Request, server_url: &str, dir: &str) -> String 
         if let Some(oid) = o.get("oid").and_then(|v| v.as_str()) {
             let mut o_map = o.as_object().cloned().unwrap_or_default();
             o_map.insert("authenticated".to_string(), serde_json::json!(false));
-            let path = format!("data/{}objects/{}", dir, oid);
+            let (d1, d2) = if oid.len() >= 4 {
+                (&oid[0..2], &oid[2..4])
+            } else {
+                ("00", "00")
+            };
+            let path = format!("data/{}objects/{}/{}/{}", dir, d1, d2, oid);
             let exists = Path::new(&path).exists();
             let mut actions = o_map.get("actions").cloned().unwrap_or(serde_json::json!({}));
             if operation == "upload" && !exists {
@@ -223,13 +228,18 @@ fn upload(request: &cgi::Request, dir: &str, params: &HashMap<String, String>) -
             return cgi::empty_response(404);
         }
     };
-    let objects_dir = format!("data/{}objects", dir);
+    let (d1, d2) = if oid.len() >= 4 {
+        (&oid[0..2], &oid[2..4])
+    } else {
+        ("00", "00")
+    };
+    let objects_dir = format!("data/{}objects/{}/{}", dir, d1, d2);
     let path = format!("{}/{}", objects_dir, oid);
     let path_obj = Path::new(&path);
 
     // Create directory if not exists
     if !Path::new(&objects_dir).exists() {
-        if let Err(e) = fs::create_dir_all(&objects_dir) {
+        if let Err(_e) = fs::create_dir_all(&objects_dir) {
             return cgi::empty_response(500);
         }
     }
@@ -237,12 +247,12 @@ fn upload(request: &cgi::Request, dir: &str, params: &HashMap<String, String>) -
     if !path_obj.exists() {
         let mut file = match File::create(&path) {
             Ok(f) => f,
-            Err(e) => {
+            Err(_e) => {
                 return cgi::empty_response(500);
             }
         };
         let body = request.body();
-        if let Err(e) = file.write_all(body) {
+        if let Err(_e) = file.write_all(body) {
             return cgi::empty_response(500);
         }
     }
@@ -256,7 +266,12 @@ fn download(dir: &str, params: &HashMap<String, String>) -> cgi::Response {
             return cgi::empty_response(404);
         }
     };
-    let path = format!("data/{}objects/{}", dir, oid);
+    let (d1, d2) = if oid.len() >= 4 {
+        (&oid[0..2], &oid[2..4])
+    } else {
+        ("00", "00")
+    };
+    let path = format!("data/{}objects/{}/{}/{}", dir, d1, d2, oid);
     let path_obj = Path::new(&path);
     if path_obj.exists() {
         let mut file = match File::open(&path) {
