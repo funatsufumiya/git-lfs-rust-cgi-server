@@ -1,4 +1,5 @@
 extern crate cgi;
+use chrono::{Utc, Local, DateTime, Date};
 use log::info;
 use log::LevelFilter;
 use std::fs::{self, File};
@@ -85,7 +86,9 @@ fn get_server_url(env: &std::collections::HashMap<String, String>) -> String {
 // --- Main handler ---
 cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
     if is_logger_init() {
-        info!("Hello to logger!");
+        // info!("Hello to logger!");
+        let now = Local::now();
+        info!("Access at {}", now.format("%Y-%m-%d %H:%M:%S"));
     }
 
     let uri = request.uri().to_string();
@@ -96,8 +99,21 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
     let server_url = "".to_string(); // Placeholder or reconstruct as needed
     let mut dir = String::new();
 
+    // /version
+    if str_ends_with(api, "/version") {
+        let body = format!(
+            r#"{{"version":"{}","name":"git-lfs-rust-cgi-server"}}"#,
+            env!("CARGO_PKG_VERSION")
+        );
+        return json_response(200, &body);
+    }
+    // /test
+    else if str_ends_with(api, "/test") {
+        let body = r#"{"message":"This is a test endpoint","status":"ok"}"#;
+        return json_response(200, body);
+    }
     // /locks/verify
-    if str_ends_with(api, "/locks/verify") {
+    else if str_ends_with(api, "/locks/verify") {
         dir = slash_process(str_before(api, "/locks/verify"));
         let body = locks_verify(&request);
         return json_response(200, &body);
