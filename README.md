@@ -9,6 +9,7 @@
 > If you can't cross compile on Windows, try WSL instead.
 
 ```bash
+$ rustup target add x86_64-unknown-linux-musl
 $ cargo build --target x86_64-unknown-linux-musl --release
 $ ls target/x86_64-unknown-linux-musl/release/git-lfs-rust-cgi-server
 # target/x86_64-unknown-linux-musl/release/git-lfs-rust-cgi-server
