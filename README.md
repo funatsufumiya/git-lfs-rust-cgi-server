@@ -1,5 +1,7 @@
 # git-lfs-rust-cgi-server
 
+Git LFS server for CGI, written with Rust language.
+
 ## Usage
 
 place `git-lfs-rust.cgi` into your server, then set `.lfsconfig` like this:
