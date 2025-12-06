@@ -54,7 +54,10 @@ fn str_before<'a>(haystack: &'a str, needle: &str) -> &'a str {
     }
 }
 fn slash_process(s: &str) -> String {
-    let mut s = s.trim_start_matches('/').to_string();
+    let mut s = s.replace("//", "/").trim_start_matches('/').to_string();
+    if s.is_empty() {
+        return s;
+    }
     if !s.ends_with('/') {
         s.push('/');
     }
@@ -63,21 +66,30 @@ fn slash_process(s: &str) -> String {
 
 // --- Repo dir extraction ---
 fn extract_repo_dir(request: &cgi::Request, api: &str) -> String {
+    let normalize = |path: &str| {
+        let path = path.replace("//", "/");
+        let path = path.trim_matches('/').to_string();
+        if path.is_empty() {
+            return "".to_string();
+        }
+        path.to_string()
+    };
+
     if let Some(path_info) = request.headers().get("x-cgi-path-info").and_then(|v| v.to_str().ok()) {
-        let path = path_info.trim_start_matches('/');
+        let path = normalize(path_info);
         let candidates = ["/objects", "/locks", "/upload", "/download"];
         for needle in candidates.iter() {
             if let Some(pos) = path.find(needle) {
-                return path[..pos].to_string();
+                return normalize(&path[..pos]);
             }
         }
-        return path.to_string();
+        return path;
     }
     let candidates = ["/objects", "/locks", "/upload", "/download"];
-    let path = api.trim_start_matches('/');
+    let path = normalize(api);
     for needle in candidates.iter() {
         if let Some(pos) = path.find(needle) {
-            return path[..pos].to_string();
+            return normalize(&path[..pos]);
         }
     }
     "".to_string()
@@ -95,8 +107,6 @@ fn extract_script_name(request: &cgi::Request) -> String {
             return uri[..end].to_string();
         }
     }
-    // // fallback: envのSCRIPT_NAMEや空文字
-    // request.env().get("SCRIPT_NAME").cloned().unwrap_or_default()
     return "git-lfs-rust.cgi".to_string();
 }
 
