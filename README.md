@@ -26,5 +26,5 @@ $ cp target/debug/git-lfs-rust-cgi-server cgi-bin/git-lfs-rust.cgi
 $ python3 -m http.server --cgi
 
 # then, from other terminal window:
-$ curl localhost:8000/cgi-bin/git-lfs-rust.cgi
+$ curl http://localhost:8000/cgi-bin/git-lfs-rust.cgi
 ```
