@@ -5,6 +5,9 @@
 
 ## Deploy
 
+> [!NOTE]
+> If you can't cross compile on Windows, try WSL instead.
+
 ```bash
 $ cargo build --target x86_64-unknown-linux-musl --release
 $ ls target/x86_64-unknown-linux-musl/release/git-lfs-rust-cgi-server
