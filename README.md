@@ -15,7 +15,7 @@ then, your server works as LFS server!
 > Currently don't have any credential support.<br>
 > Please consider basic auth or something, and **DO NOT USE FOR SOMETHING IMPORTANT** (just use for hobby).
 
-## Deploy
+## Deploy (Install)
 
 > [!NOTE]
 > If you can't cross compile on Windows, try WSL instead.
