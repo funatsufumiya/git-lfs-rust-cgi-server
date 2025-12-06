@@ -107,7 +107,7 @@ fn extract_script_name(request: &cgi::Request) -> String {
             return uri[..end].to_string();
         }
     }
-    return "git-lfs-rust.cgi".to_string();
+    return "".to_string();
 }
 
 fn get_server_url(request: &cgi::Request) -> String {
