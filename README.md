@@ -44,3 +44,7 @@ $ python3 -m http.server --cgi
 # then, from other terminal window:
 $ curl http://localhost:8000/cgi-bin/git-lfs-rust.cgi/version
 ```
+
+## Known Issues
+
+- Please turn off WAF. WAF makes upload trouble.
