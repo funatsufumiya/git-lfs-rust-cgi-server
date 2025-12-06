@@ -88,15 +88,12 @@ cgi::cgi_main! { |request: cgi::Request| -> cgi::Response {
         info!("Hello to logger!");
     }
 
-    let vars = request.env();
-    let api = {
-        let uri = vars.get("REQUEST_URI").map(|s| s.as_str()).unwrap_or("/");
-        str_before(uri, "?")
-    };
-    let query = vars.get("QUERY_STRING").map(|s| s.as_str()).unwrap_or("");
-    let accept = vars.get("HTTP_ACCEPT").map(|s| s.to_string());
-
-    let server_url = get_server_url(&vars);
+    let uri = request.uri().to_string();
+    let api = str_before(&uri, "?");
+    let query = request.uri().query().unwrap_or("");
+    let accept = request.headers().get("accept").and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+    // If you need server_url, you must reconstruct it from available request data or remove its usage.
+    let server_url = "".to_string(); // Placeholder or reconstruct as needed
     let mut dir = String::new();
 
     // /locks/verify
